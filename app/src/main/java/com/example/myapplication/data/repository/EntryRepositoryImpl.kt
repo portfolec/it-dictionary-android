@@ -4,6 +4,7 @@ import com.example.myapplication.data.local.dao.EntryDao
 import com.example.myapplication.data.local.entity.EntryEntity
 import com.example.myapplication.data.local.entity.toEntity
 import com.example.myapplication.data.remote.api.DictionaryApi
+import com.example.myapplication.data.remote.dto.CreateEntryRequest
 import com.example.myapplication.domain.model.AdminStats
 import com.example.myapplication.domain.model.Entry
 import com.example.myapplication.domain.repository.EntryRepository
@@ -37,14 +38,47 @@ class EntryRepositoryImpl @Inject constructor(
     override suspend fun getEntryById(id: String): Entry? =
         dao.getEntryById(id)?.toDomain()
 
-    override suspend fun insertEntry(entry: Entry) =
+    override suspend fun insertEntry(entry: Entry) {
         dao.insertEntry(entry.toEntity())
+        try {
+            api.createEntry(
+                CreateEntryRequest(
+                    title        = entry.title,
+                    shortDescription = entry.shortDescription,
+                    fullDescription  = entry.fullDescription,
+                    codeExample  = entry.codeExample,
+                    category     = entry.category,
+                    tags         = entry.tags,
+                    relatedTerms = entry.relatedTerms,
+                    isPublished  = entry.isPublished
+                )
+            )
+        } catch (_: Exception) { /* сохранено локально, синхронизируем позже */ }
+    }
 
-    override suspend fun updateEntry(entry: Entry) =
-        dao.updateEntry(entry.toEntity())
+    override suspend fun updateEntry(entry: Entry) {
+        dao.insertEntry(entry.toEntity())
+        try {
+            api.updateEntry(
+                id = entry.id,
+                request = CreateEntryRequest(
+                    title        = entry.title,
+                    shortDescription = entry.shortDescription,
+                    fullDescription  = entry.fullDescription,
+                    codeExample  = entry.codeExample,
+                    category     = entry.category,
+                    tags         = entry.tags,
+                    relatedTerms = entry.relatedTerms,
+                    isPublished  = entry.isPublished
+                )
+            )
+        } catch (_: Exception) { /* offline — обновлено локально */ }
+    }
 
-    override suspend fun deleteEntry(id: String) =
+    override suspend fun deleteEntry(id: String) {
         dao.deleteEntry(id)
+        try { api.deleteEntry(id) } catch (_: Exception) {}
+    }
 
     override suspend fun toggleBookmark(entryId: String) =
         dao.toggleBookmark(entryId)
@@ -72,27 +106,45 @@ class EntryRepositoryImpl @Inject constructor(
         try {
             val remoteEntries = api.getAllEntries()
 
-            // Защита: если сервер вернул пустой список — не трогаем локальные данные
-            if (remoteEntries.size < 3) return
+            if (remoteEntries.isEmpty()) {
+                // Сервер (Neon) пустой — заливаем все локальные записи
+                val localEntries = dao.getAllEntriesOnce()
+                localEntries.forEach { entity ->
+                    try {
+                        api.createEntry(
+                            CreateEntryRequest(
+                                title            = entity.title,
+                                shortDescription = entity.shortDescription,
+                                fullDescription  = entity.fullDescription,
+                                codeExample      = entity.codeExample,
+                                category         = entity.category,
+                                tags             = if (entity.tags.isBlank()) emptyList()
+                                                   else entity.tags.split(","),
+                                relatedTerms     = if (entity.relatedTerms.isBlank()) emptyList()
+                                                   else entity.relatedTerms.split(","),
+                                isPublished      = entity.isPublished
+                            )
+                        )
+                    } catch (_: Exception) {}
+                }
+                return
+            }
 
-            // Удаляем незакладкованные локальные данные
-            dao.deleteNonBookmarked()
-
-            // Вставляем актуальные данные с сервера
+            // Сервер не пустой — обновляем локальный кэш
             val entities = remoteEntries.map { dto ->
                 EntryEntity(
-                    id = dto.id,
-                    title = dto.title,
+                    id               = dto.id,
+                    title            = dto.title,
                     shortDescription = dto.shortDescription,
-                    fullDescription = dto.fullDescription,
-                    codeExample = dto.codeExample,
-                    category = dto.category,
-                    tags = dto.tags.joinToString(","),
-                    relatedTerms = dto.relatedTerms.joinToString(","),
-                    views = dto.views,
-                    updatedAt = dto.updatedAt,
-                    isPublished = dto.isPublished,
-                    isBookmarked = false
+                    fullDescription  = dto.fullDescription,
+                    codeExample      = dto.codeExample,
+                    category         = dto.category,
+                    tags             = dto.tags.joinToString(","),
+                    relatedTerms     = dto.relatedTerms.joinToString(","),
+                    views            = dto.views,
+                    updatedAt        = dto.updatedAt,
+                    isPublished      = dto.isPublished,
+                    isBookmarked     = false
                 )
             }
             dao.insertEntries(entities)

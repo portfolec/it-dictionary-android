@@ -4,8 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myapplication.domain.model.Entry
 import com.example.myapplication.domain.repository.EntryRepository
+import com.example.myapplication.domain.usecase.GetAllEntriesUseCase
 import com.example.myapplication.domain.usecase.GetPopularEntriesUseCase
-import com.example.myapplication.domain.usecase.GetRecentEntriesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,8 +22,8 @@ data class HomeState(
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
+    private val getAllEntries: GetAllEntriesUseCase,
     private val getPopularEntries: GetPopularEntriesUseCase,
-    private val getRecentEntries: GetRecentEntriesUseCase,
     private val repository: EntryRepository
 ) : ViewModel() {
 
@@ -36,7 +36,6 @@ class HomeViewModel @Inject constructor(
 
     private fun syncAndLoad() {
         viewModelScope.launch {
-            // Сначала синхронизируем с сервером
             _state.value = _state.value.copy(isSyncing = true)
             try {
                 repository.syncWithRemote()
@@ -45,11 +44,17 @@ class HomeViewModel @Inject constructor(
             }
             _state.value = _state.value.copy(isSyncing = false)
 
-            // Загружаем из Room (уже обновлённый)
+            // Объединяем популярные + ВСЕ записи (для отображения новых)
             combine(
                 getPopularEntries(),
-                getRecentEntries()
-            ) { popular, recent ->
+                getAllEntries()
+            ) { popular, all ->
+                // "Недавно добавлено" — все, кроме тех что уже в Popular, по дате DESC
+                val popularIds = popular.map { it.id }.toSet()
+                val recent = all
+                    .sortedByDescending { it.updatedAt }
+                    .filter { it.id !in popularIds }
+                    .take(10)
                 HomeState(
                     popularEntries = popular,
                     recentEntries = recent,

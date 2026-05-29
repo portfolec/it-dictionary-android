@@ -13,6 +13,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
 
@@ -85,8 +88,9 @@ class AdminViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             _editState.value = _editState.value.copy(isLoading = true)
+            val entryId = if (id.isNullOrBlank()) UUID.randomUUID().toString() else id
             val entry = Entry(
-                id = id ?: UUID.randomUUID().toString(),
+                id = entryId,
                 title = title,
                 shortDescription = shortDesc,
                 fullDescription = fullDesc,
@@ -95,7 +99,7 @@ class AdminViewModel @Inject constructor(
                 tags = tags,
                 relatedTerms = related,
                 views = _editState.value.entry?.views ?: 0,
-                updatedAt = "Только что",
+                updatedAt = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date()),
                 isPublished = isPublished
             )
             saveEntry(entry)

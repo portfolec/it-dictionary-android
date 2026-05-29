@@ -58,11 +58,9 @@ class SaveEntryUseCase @Inject constructor(
     private val repository: EntryRepository
 ) {
     suspend operator fun invoke(entry: Entry) {
-        if (entry.id.isEmpty()) {
-            repository.insertEntry(entry)
-        } else {
-            repository.updateEntry(entry)
-        }
+        // insertEntry использует OnConflictStrategy.REPLACE —
+        // работает и для новых записей, и для обновления существующих
+        repository.insertEntry(entry)
     }
 }
 

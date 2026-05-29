@@ -25,6 +25,9 @@ interface EntryDao {
     @Query("SELECT * FROM entries WHERE isBookmarked = 1")
     fun getBookmarkedEntries(): Flow<List<EntryEntity>>
 
+    @Query("SELECT * FROM entries WHERE isPublished = 1")
+    suspend fun getAllEntriesOnce(): List<EntryEntity>
+
     @Query("SELECT * FROM entries WHERE id = :id")
     suspend fun getEntryById(id: String): EntryEntity?
 

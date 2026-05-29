@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "27495866625",
+    "project_id": "itspr-e1c7f",
+    "storage_bucket": "itspr-e1c7f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:27495866625:android:58e30d122564910e52fb00",
+        "android_client_info": {
+          "package_name": "com.example.myapplication"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCCc7rNgPPGnvPZimxxqY6vYmqjyQ3seIg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
